@@ -1,0 +1,66 @@
+enable
+R3# configure terminal
+R3(config)# zone security EXTERNAL
+
+Ahora configurará un mapa de clases que coincida con todas las direcciones IP de la red interna. Primero, creará una ACL que defina la red interna en R3. También creará un mapa de clase para inspeccionar el tráfico interno.
+
+1. Crear la ACL (Lista de Control de Acceso)
+Esta lista identificará el tráfico que viene de tu red local. Asegúrate de estar en el modo R3(config)#.
+
+R3(config)# access-list 101 permit ip 192.168.3.0 0.0.0.255 any
+
+Como ya creamos la ACL (probablemente la 101 del paso anterior), ahora le diremos al router que use esa lista para identificar qué tráfico debe pasar por el motor de inspección del firewall.
+
+Ejecuta estos comandos en R3:
+
+R3(config)# class-map type inspect match-all IN-NET-CLASS-MAP
+R3(config-cmap)# match access-group 101
+R3(config-cmap)# exit
+
+Cree un mapa de políticas para inspeccionar el tráfico coincidente.
+
+Ahora que ya tienes definido el Class-Map (que identifica "quién"), vamos a crear el Policy-Map (que define "qué hacer"). En este caso, la acción será inspect.
+
+La inspección es clave porque permite que el router "recuerde" las conexiones que salen de tu red interna y deje pasar automáticamente las respuestas que regresan desde el exterior.
+
+Ejecuta estos comandos en R3:
+
+Bash
+R3(config)# policy-map type inspect IN-2-OUT-POLICY
+R3(config-pmap)# class type inspect IN-NET-CLASS-MAP
+R3(config-pmap-c)# inspect
+R3(config-pmap-c)# exit
+R3(config-pmap)# exit
+
+Este es el paso donde finalmente "conectas los cables" lógicos de tu firewall. Al crear el Zone-Pair, le indicas al router que el tráfico fluye desde la zona INTERNAL hacia la EXTERNAL y que debe aplicar las reglas que definimos en el Policy-Map.
+
+Ejecuta los siguientes comandos en R3:
+
+Bash
+R3(config)# zone-pair security IN-TO-OUT source INTERNAL destination EXTERNAL
+R3(config-sec-zone-pair)# service-policy type inspect IN-2-OUT-POLICY
+
+En este paso asignará las interfaces correctas a las zonas de seguridad que creó anteriormente en R3.
+
+Según tu tabla de direccionamiento para R3, la interfaz G0/1 conecta a tu red local (PC-C) y la S0/0/1 conecta hacia el exterior (R2).
+
+Ejecuta estos comandos en R3:
+
+1. Asignar la Interfaz Interna (LAN)
+Bash
+R3(config)# interface GigabitEthernet0/1
+R3(config-if)# zone-member security INTERNAL
+R3(config-if)# exit
+2. Asignar la Interfaz Externa (WAN)
+Bash
+R3(config)# interface Serial0/0/1
+R3(config-if)# zone-member security EXTERNAL
+R3(config-if)# exit
+
+
+Cómo verificarlo en el Router R3
+Para ver estos datos exactos "en vivo" dentro de Packet Tracer, ejecuta el siguiente comando en R3:
+
+Bash
+R3# show policy-map type inspect zone-pair sessions
+
